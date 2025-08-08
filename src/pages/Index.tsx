@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import FilterBar, { type FilterValue } from "@/components/FilterBar";
-import DayView from "@/components/DayView";
+import FilterBar from "@/components/FilterBar";
 const Index = () => {
-  const [filters, setFilters] = useState<FilterValue>({ cinemas: [], date: new Date(), view: "day" });
   useEffect(() => {
     const run = async () => {
-      const { data, error } = await supabase.rpc("get_server_time");
+      const {
+        data,
+        error
+      } = await supabase.rpc("get_server_time");
       if (error) {
         console.error("Supabase connectivity check failed:", error);
       } else {
@@ -15,12 +16,10 @@ const Index = () => {
     };
     run();
   }, []);
-
-  return (
-    <div className="min-h-screen">
+  return <div className="min-h-screen">
       <header className="border-b border-border">
         <div className="container py-8">
-          <h1 className="text-center text-3xl md:text-5xl font-extrabold tracking-tight title-sheen">
+          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight title-sheen text-left">
             London Repertory Cinema Listings
           </h1>
         </div>
@@ -28,15 +27,8 @@ const Index = () => {
 
       <main className="container py-10">
         <div className="mb-6">
-          <FilterBar onChange={(v) => setFilters(v)} />
+          <FilterBar onChange={v => console.log("Filters changed:", v)} />
         </div>
-
-        {filters.view === "day" && (
-          <div className="mb-6">
-            <DayView date={filters.date} cinemaIds={filters.cinemas} />
-          </div>
-        )}
-
         <section aria-labelledby="content-ready" className="rounded-lg border border-border bg-card/50 p-8">
           <h2 id="content-ready" className="sr-only">Main Content</h2>
           <p className="text-muted-foreground">
@@ -44,8 +36,6 @@ const Index = () => {
           </p>
         </section>
       </main>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
