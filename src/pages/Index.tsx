@@ -19,7 +19,7 @@ const Index = () => {
   return <div className="min-h-screen">
       <header className="border-b border-border">
         <div className="container py-8">
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight title-sheen text-left">
+          <h1 className="text-3xl tracking-tight title-sheen text-left md:text-3xl font-semibold">
             London Repertory Cinema Listings
           </h1>
         </div>
