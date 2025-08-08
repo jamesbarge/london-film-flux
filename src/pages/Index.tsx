@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import FilterBar from "@/components/FilterBar";
+import FilterBar, { type FilterValue } from "@/components/FilterBar";
+import DayView from "@/components/DayView";
 const Index = () => {
+  const [filters, setFilters] = useState<FilterValue>({ cinemas: [], date: new Date(), view: "day" });
   useEffect(() => {
     const run = async () => {
       const { data, error } = await supabase.rpc("get_server_time");
@@ -26,8 +28,15 @@ const Index = () => {
 
       <main className="container py-10">
         <div className="mb-6">
-          <FilterBar onChange={(v) => console.log("Filters changed:", v)} />
+          <FilterBar onChange={(v) => setFilters(v)} />
         </div>
+
+        {filters.view === "day" && (
+          <div className="mb-6">
+            <DayView date={filters.date} cinemaIds={filters.cinemas} />
+          </div>
+        )}
+
         <section aria-labelledby="content-ready" className="rounded-lg border border-border bg-card/50 p-8">
           <h2 id="content-ready" className="sr-only">Main Content</h2>
           <p className="text-muted-foreground">
