@@ -1,5 +1,6 @@
 import React from "react";
 import { format } from "date-fns";
+import { Loader2, Film } from "lucide-react";
 import { useScreenings } from "@/hooks/useScreenings";
 
 interface DayViewProps {
@@ -21,7 +22,10 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
   if (isLoading) {
     return (
       <section aria-label="Day schedule" className="rounded-lg border border-border bg-card/50 p-4">
-        <p className="text-muted-foreground text-sm">Loading screenings…</p>
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          <span>Loading screenings…</span>
+        </div>
       </section>
     );
   }
@@ -37,7 +41,13 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
   if (!data || data.length === 0) {
     return (
       <section aria-label="Day schedule" className="rounded-lg border border-border bg-card/50 p-4">
-        <p className="text-muted-foreground text-sm">No screenings found for this date.</p>
+        <div className="flex items-center gap-3">
+          <Film className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium">No screenings on {format(date!, "EEE d MMM")}</p>
+            <p className="text-xs text-muted-foreground">Try a different date or adjust your cinema filters.</p>
+          </div>
+        </div>
       </section>
     );
   }

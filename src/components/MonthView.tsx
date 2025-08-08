@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth } from "date-fns";
-
+import { Loader2 } from "lucide-react";
 interface MonthViewProps {
   date?: Date;
   cinemaIds: string[];
@@ -55,9 +55,17 @@ const MonthView: React.FC<MonthViewProps> = ({ date, cinemaIds, onSelectDay }) =
     <section aria-label="Month schedule" className="rounded-lg border border-border bg-card/50 p-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-base font-semibold">Calendar</h3>
-        {isLoading && <span className="text-xs text-muted-foreground">Loading…</span>}
+        {isLoading && (
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            Loading…
+          </span>
+        )}
         {isError && <span className="text-xs text-destructive">Failed to load highlights</span>}
       </div>
+      {!isLoading && !isError && highlightedDays.length === 0 && (
+        <p className="mb-2 text-xs text-muted-foreground">No screenings found this month for the selected cinemas.</p>
+      )}
       <Calendar
         mode="single"
         selected={date}
