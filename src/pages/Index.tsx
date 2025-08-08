@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-
+import FilterBar from "@/components/FilterBar";
 const Index = () => {
   useEffect(() => {
     const run = async () => {
@@ -25,6 +25,9 @@ const Index = () => {
       </header>
 
       <main className="container py-10">
+        <div className="mb-6">
+          <FilterBar onChange={(v) => console.log("Filters changed:", v)} />
+        </div>
         <section aria-labelledby="content-ready" className="rounded-lg border border-border bg-card/50 p-8">
           <h2 id="content-ready" className="sr-only">Main Content</h2>
           <p className="text-muted-foreground">
