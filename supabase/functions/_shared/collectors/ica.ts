@@ -1,5 +1,4 @@
-// ICA scraper logic module (no Deno.serve side effects)
-// Exports a function that returns ScreeningRow[] without upserting
+// ICA collector: parses ICA events and returns ScreeningRow[] (no upsert, no Deno.serve)
 
 import { load } from "npm:cheerio@1.0.0-rc.12";
 import {
@@ -8,10 +7,10 @@ import {
   detectFormats,
   makeId,
   type ScreeningRow,
-} from "../_shared/scraper-helpers.ts";
+} from "../scraper-helpers.ts";
 
-export const LIST_URL = "https://www.ica.art/whats-on/cinema";
-export const VENUE_ID = "ica";
+const LIST_URL = "https://www.ica.art/whats-on/cinema";
+const VENUE_ID = "ica";
 
 function resolveUrl(href: string | undefined, base: string): string | undefined {
   if (!href) return undefined;

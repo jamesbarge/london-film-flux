@@ -1,5 +1,4 @@
-// BFI Southbank scraper logic module (no Deno.serve side effects)
-// Exports a function that returns ScreeningRow[] without upserting
+// BFI Southbank collector: parses Calendar/programme pages and returns ScreeningRow[]
 
 import { load } from "npm:cheerio@1.0.0-rc.12";
 import {
@@ -8,10 +7,10 @@ import {
   detectFormats,
   makeId,
   type ScreeningRow,
-} from "../_shared/scraper-helpers.ts";
+} from "../scraper-helpers.ts";
 
-export const LIST_URL = "https://whatson.bfi.org.uk/southbank/Calendar";
-export const VENUE_ID = "bfi-southbank";
+const LIST_URL = "https://whatson.bfi.org.uk/southbank/Calendar";
+const VENUE_ID = "bfi-southbank";
 
 function resolveUrl(href: string | undefined, base: string): string | undefined {
   if (!href) return undefined;

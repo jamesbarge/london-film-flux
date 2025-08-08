@@ -2,8 +2,8 @@
 
 import { createScraper, type ScrapeContext } from "../_shared/create-scraper.ts";
 import { upsertScreenings, sleep, type ScreeningRow } from "../_shared/scraper-helpers.ts";
-import { collectIcaRows } from "../scrape_ica/logic.ts";
-import { collectBfiRows } from "../scrape_bfi/logic.ts";
+import { collectIcaRows } from "../_shared/collectors/ica.ts";
+import { collectBfiRows } from "../_shared/collectors/bfi.ts";
 
 async function scrapeAll({ userAgent }: ScrapeContext): Promise<any> {
   const perVenue: Record<string, ScreeningRow[]> = {};
