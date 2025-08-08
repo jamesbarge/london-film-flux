@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cinemas: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      films: {
+        Row: {
+          created_at: string
+          id: string
+          runtime_mins: number | null
+          title: string
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          runtime_mins?: number | null
+          title: string
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          runtime_mins?: number | null
+          title?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      screenings: {
+        Row: {
+          cinema_id: string
+          created_at: string
+          end_time: string | null
+          film_id: string
+          id: string
+          screen: string | null
+          start_time: string
+        }
+        Insert: {
+          cinema_id: string
+          created_at?: string
+          end_time?: string | null
+          film_id: string
+          id?: string
+          screen?: string | null
+          start_time: string
+        }
+        Update: {
+          cinema_id?: string
+          created_at?: string
+          end_time?: string | null
+          film_id?: string
+          id?: string
+          screen?: string | null
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "screenings_cinema_id_fkey"
+            columns: ["cinema_id"]
+            isOneToOne: false
+            referencedRelation: "cinemas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenings_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
