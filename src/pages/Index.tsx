@@ -1,12 +1,22 @@
-// Update this page (the content is just a fallback if you fail to update the page)
-
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen">
+      <header className="border-b border-border">
+        <div className="container py-8">
+          <h1 className="text-center text-3xl md:text-5xl font-extrabold tracking-tight title-sheen">
+            London Repertory Cinema Listings
+          </h1>
+        </div>
+      </header>
+
+      <main className="container py-10">
+        <section aria-labelledby="content-ready" className="rounded-lg border border-border bg-card/50 p-8">
+          <h2 id="content-ready" className="sr-only">Main Content</h2>
+          <p className="text-muted-foreground">
+            This area is ready for components: filters, calendars, and cinema schedules.
+          </p>
+        </section>
+      </main>
     </div>
   );
 };
