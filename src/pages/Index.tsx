@@ -1,4 +1,19 @@
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
 const Index = () => {
+  useEffect(() => {
+    const run = async () => {
+      const { data, error } = await supabase.rpc("get_server_time");
+      if (error) {
+        console.error("Supabase connectivity check failed:", error);
+      } else {
+        console.log("Supabase connectivity check (server time):", data);
+      }
+    };
+    run();
+  }, []);
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
