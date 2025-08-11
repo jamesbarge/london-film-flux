@@ -25,42 +25,82 @@ async function fetchViaFirecrawl(url: string): Promise<string> {
 
   console.warn("fetchHtml: using Firecrawl fallback", { url });
 
-  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      url,
-      formats: ["html"],
-      onlyMainContent: false,
-    }),
-  });
+  const extractHtml = (data: any): string | null => {
+    const candidates = [
+      data?.data?.html,
+      Array.isArray(data?.data) ? data?.data?.[0]?.html : undefined,
+      data?.html,
+      Array.isArray(data) ? data?.[0]?.html : undefined,
+      data?.data?.content,
+      Array.isArray(data?.data) ? data?.data?.[0]?.content : undefined,
+      data?.content,
+      data?.markdown,
+      Array.isArray(data) ? data?.[0]?.content : undefined,
+      Array.isArray(data) ? data?.[0]?.markdown : undefined,
+    ].filter((v) => typeof v === "string" && v.trim().length > 0);
 
-  if (!res.ok) {
-    throw new Error(`Firecrawl HTTP ${res.status}`);
+    return candidates.length > 0 ? String(candidates[0]) : null;
+  };
+
+  // 1) Try the scrape endpoint first
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["html"],
+        onlyMainContent: false,
+      }),
+    });
+
+    if (res.ok) {
+      const data: any = await res.json();
+      const html = extractHtml(data);
+      if (html) {
+        console.warn("Firecrawl scrape returned html", { url, length: html.length });
+        return html;
+      }
+    } else {
+      console.error("Firecrawl scrape HTTP error", { url, status: res.status });
+    }
+  } catch (e) {
+    console.error("Firecrawl scrape failed", { url, error: (e as Error)?.message });
   }
 
-  // Try to robustly extract HTML from various possible response shapes
-  const data: any = await res.json();
-  const candidates = [
-    data?.data?.html,
-    Array.isArray(data?.data) ? data?.data?.[0]?.html : undefined,
-    data?.html,
-    Array.isArray(data) ? data?.[0]?.html : undefined,
-    data?.data?.content,
-    data?.content,
-  ].filter((v) => typeof v === "string" && v.trim().length > 0);
+  // 2) Fallback to a 1-page crawl if scrape didn't yield usable HTML
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/crawl", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        limit: 1,
+        scrapeOptions: { formats: ["html"] },
+      }),
+    });
 
-  if (candidates.length > 0) {
-    return String(candidates[0]);
+    if (res.ok) {
+      const data: any = await res.json();
+      const html = extractHtml(data);
+      if (html) {
+        console.warn("Firecrawl crawl returned html", { url, length: html.length });
+        return html;
+      }
+    } else {
+      console.error("Firecrawl crawl HTTP error", { url, status: res.status });
+    }
+  } catch (e) {
+    console.error("Firecrawl crawl failed", { url, error: (e as Error)?.message });
   }
 
-  console.warn("Firecrawl fallback: no explicit html field found; returning empty string", {
-    url,
-    keys: Object.keys(data || {}),
-  });
+  console.warn("Firecrawl fallback: no usable html found; returning empty string", { url });
   return "";
 }
 

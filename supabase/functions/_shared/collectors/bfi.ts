@@ -174,6 +174,59 @@ async function parseCardsOnPage(url: string, userAgent: string): Promise<Screeni
   return rows;
 }
 
+async function firecrawlDiscoverLinks(startUrl: string, limit: number): Promise<string[]> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) return [];
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/crawl", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url: startUrl,
+        limit,
+        scrapeOptions: { formats: ["html"] },
+      }),
+    });
+    if (!res.ok) {
+      console.error("Firecrawl discovery failed", { status: res.status });
+      return [];
+    }
+    const data: any = await res.json();
+    const items: any[] = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+
+    const out = new Set<string>();
+    for (const it of items) {
+      const pageUrl: string | undefined = it?.url || it?.metadata?.url || it?.source?.url;
+      if (pageUrl && /^https:\/\/whatson\.bfi\.org\.uk\//.test(pageUrl) && /\/southbank\//i.test(pageUrl) && !/\/southbank\/Calendar(\/?|\b)/i.test(pageUrl)) {
+        out.add(pageUrl);
+      }
+      const html: string | undefined = it?.html || it?.content || it?.markdown;
+      if (typeof html === "string" && html) {
+        try {
+          const $ = load(html);
+          $("a[href]").each((_, el) => {
+            const href = $(el).attr("href") || "";
+            const full = resolveUrl(href, pageUrl || startUrl);
+            if (!full) return;
+            if (!/^https:\/\/whatson\.bfi\.org\.uk\//.test(full)) return;
+            if (/\/southbank\/Calendar(\/?|\b)/i.test(full)) return;
+            if (/\/southbank\//i.test(full)) out.add(full);
+          });
+        } catch {}
+      }
+    }
+    const arr = Array.from(out).slice(0, 200);
+    console.warn("Firecrawl discovery collected links", { count: arr.length });
+    return arr;
+  } catch (e) {
+    console.error("Firecrawl discovery error", { error: (e as Error)?.message });
+    return [];
+  }
+}
+
 export async function collectBfiRows(userAgent: string): Promise<ScreeningRow[]> {
   const startUrls = [
     LIST_URL,
@@ -191,21 +244,30 @@ export async function collectBfiRows(userAgent: string): Promise<ScreeningRow[]>
       firstErr = firstErr ?? e;
     }
   }
-  if (!listHtml) throw firstErr ?? new Error("Failed to load BFI listing pages");
 
-  const $ = load(listHtml);
   const linkSet = new Set<string>();
 
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href") || "";
-    const full = resolveUrl(href, LIST_URL);
-    if (!full) return;
-    if (!/^https:\/\/whatson\.bfi\.org\.uk\//.test(full)) return;
-    if (/\/southbank\/Calendar(\/?|\b)/i.test(full)) return;
-    if (/\/southbank\//i.test(full)) linkSet.add(full);
-  });
-
-  linkSet.add(LIST_URL);
+  if (listHtml) {
+    const $ = load(listHtml);
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href") || "";
+      const full = resolveUrl(href, LIST_URL);
+      if (!full) return;
+      if (!/^https:\/\/whatson\.bfi\.org\.uk\//.test(full)) return;
+      if (/\/southbank\/Calendar(\/?|\b)/i.test(full)) return;
+      if (/\/southbank\//i.test(full)) linkSet.add(full);
+    });
+    linkSet.add(LIST_URL);
+  } else {
+    if (Deno.env.get("FIRECRAWL_API_KEY")) {
+      console.warn("BFI: using Firecrawl discovery fallback");
+      const discovered = await firecrawlDiscoverLinks("https://whatson.bfi.org.uk/southbank/", 30);
+      for (const l of discovered) linkSet.add(l);
+      if (linkSet.size === 0) throw firstErr ?? new Error("Failed to load BFI listing pages (no links discovered)");
+    } else {
+      throw firstErr ?? new Error("Failed to load BFI listing pages");
+    }
+  }
 
   const links = Array.from(linkSet).slice(0, 250);
 
