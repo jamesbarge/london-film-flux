@@ -1,4 +1,14 @@
-project_id = "dlhkvzslowervdyzideq"
 
-[functions.generate_blurb]
+# ... keep existing code (project_id and [functions.generate_blurb]) the same ...
+
+[functions.scrape_ica]
+verify_jwt = false
+
+[functions.scrape_bfi]
+verify_jwt = false
+
+[functions.scrape_all]
+verify_jwt = false
+
+[functions.scrape_screenings]
 verify_jwt = false
