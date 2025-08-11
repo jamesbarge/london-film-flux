@@ -23,36 +23,18 @@ export type ScreeningRow = {
 
 export const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-export async function fetchHtml(
-  url: string,
-  userAgent =
-    "London Rep Listings Bot/1.0 (+https://lovable.dev); polite crawler"
-): Promise<string> {
-  const maxRetries = 3;
-  const baseDelay = 400; // ms
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const resp = await fetch(url, {
-        headers: {
-          "User-Agent": userAgent,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
-      });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status} fetching ${url}`);
-      }
-      const html = await resp.text();
-      return html;
-    } catch (err) {
-      lastError = err;
-      // small polite backoff with jitter
-      const delay = baseDelay * (attempt + 1) + Math.random() * 200;
-      await sleep(delay);
-    }
+export async function fetchHtml(url: string, userAgent: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      "user-agent": userAgent || "LondonRepertoryBot contact you@example.com",
+      accept: "text/html,application/xhtml+xml",
+    },
+  });
+  if (!res.ok) {
+    console.error("fetchHtml failed", { url, status: res.status });
+    throw new Error(`HTTP ${res.status} fetching ${url}`);
   }
-  throw lastError ?? new Error(`Failed to fetch ${url}`);
+  return await res.text();
 }
 
 // Convert a Date or date-like text to an ISO string representing the UTC instant
