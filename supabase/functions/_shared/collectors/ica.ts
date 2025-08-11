@@ -10,7 +10,7 @@ import {
   type ScreeningRow,
 } from "../scraper-helpers.ts";
 
-const LIST_URL = "https://www.ica.art/whats-on"; // no /cinema, that 404s
+const LIST_URL = "https://www.ica.art/films"; // current films listings
 const VENUE_ID = "ica";
 
 function resolveUrl(href: string | undefined, base: string): string | undefined {
@@ -80,9 +80,45 @@ async function scrapeEventPage(url: string, userAgent: string): Promise<Screenin
   });
   if (jsonLdEvents.length > 0) return jsonLdEvents;
 
-  const title = $("h1").first().text().trim();
+  // Prefer explicit title element ICA uses; fallback to h1
+  const title = $("#title .title").first().text().trim() || $("h1").first().text().trim();
   if (!title) return null;
 
+  // ICA page structure: list of .performance entries with .date and .time
+  const perfRows: ScreeningRow[] = [];
+  const monthMap: Record<string, string> = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  };
+  $(".performance").each((_, el) => {
+    const dateTxt = $(el).find(".date").text().trim(); // e.g., "Tue, 19 Aug 2025"
+    const timeTxt = $(el).find(".time").text().trim(); // e.g., "04:10 pm"
+    const m = dateTxt.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+    const t = timeTxt.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+    if (!m || !t) return;
+    const day = m[1].padStart(2, "0");
+    const mon = monthMap[m[2].toLowerCase() as keyof typeof monthMap];
+    const year = m[3];
+    let hour = parseInt(t[1], 10);
+    const minute = t[2];
+    const ampm = t[3].toLowerCase();
+    if (ampm === "pm" && hour < 12) hour += 12;
+    if (ampm === "am" && hour === 12) hour = 0;
+    const hh = String(hour).padStart(2, "0");
+    const iso = toLondonISO(`${year}-${mon}-${day}T${hh}:${minute}:00`);
+    perfRows.push({
+      id: makeId(VENUE_ID, iso, title),
+      title,
+      venue_id: VENUE_ID,
+      start_at: iso,
+      format: formats,
+      booking_url: url, // page-level booking widget; fallback to source URL
+      source_url: url,
+    });
+  });
+  if (perfRows.length > 0) return perfRows;
+
+  // Fallback: semantic <time datetime> (older pages)
   const times = new Set<string>();
   $("time[datetime]").each((_, el) => {
     const dt = $(el).attr("datetime")?.trim();
@@ -133,14 +169,14 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
 
   const $ = load(html);
 
-  // collect candidate links broadly from what's-on page (don't over-filter; event pages will be validated later)
+  // collect candidate links from Films page
   const links = new Set<string>();
-  $('a[href*="/whats-on"]').each((_, a) => {
+  $('a[href*="/films/"]').each((_, a) => {
     const href = $(a).attr("href")?.trim() || "";
     if (!href || href.endsWith("#")) return;
     const absolute = href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString();
     // skip the index listing itself
-    if (/\/whats-on\/?$/.test(absolute)) return;
+    if (/\/films\/?$/.test(absolute)) return;
     links.add(absolute);
   });
 
