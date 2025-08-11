@@ -42,7 +42,59 @@ function cleanAbsolute(urlStr?: string): string | undefined {
 
 function isDetailLink(u: string): boolean {
   // Only accept detail pages like /films/<slug> or /whats-on/<slug>
-  return /\/(films|whats-on)\/[^\/\?#]+$/.test(u);
+  return \/\/(films|whats-on)\/[^\/\?#]+$\/.test(u);
+}
+
+// Try to find the most reliable external booking URL on the page (prefer tickets.ica.art)
+function findBookingUrl($: any, baseUrl: string): string | undefined {
+  const prefer = (href?: string) => {
+    const abs = resolveUrl(href, baseUrl);
+    if (!abs) return undefined;
+    try {
+      const u = new URL(abs);
+      // Ignore in-page anchors
+      if (!u.protocol.startsWith("http")) return undefined;
+      if (u.hash) u.hash = "";
+      return u.toString();
+    } catch {
+      return undefined;
+    }
+  };
+
+  // 1) Explicit tickets domain
+  const tix = $('a[href*="tickets.ica.art"]').first().attr('href');
+  const tixAbs = prefer(tix);
+  if (tixAbs) return tixAbs;
+
+  // 2) Buttons/links that likely go to booking (class or href contains book/ticket/buy)
+  const ctaSelectors = [
+    'a[href*="book"]',
+    'a[href*="ticket"]',
+    'a[href*="tickets"]',
+    'a[href*="buy"]',
+    'a[class*="book"]',
+    'button[data-url]',
+    'button[data-href]',
+  ].join(', ');
+  const ctaEl = $(ctaSelectors).first();
+  const dataUrl = ctaEl.attr('data-url') || ctaEl.attr('data-href') || ctaEl.attr('href');
+  const ctaAbs = prefer(dataUrl);
+  if (ctaAbs) return ctaAbs;
+
+  // 3) Any anchor mentioning tickets domain anywhere in attributes/text
+  let fallbackAbs: string | undefined;
+  $('a').each((_, a) => {
+    if (fallbackAbs) return;
+    const href = $(a).attr('href') || '';
+    const text = $(a).text().toLowerCase();
+    if (href.includes('tickets') || text.includes('ticket') || text.includes('book')) {
+      const abs = prefer(href);
+      if (abs) fallbackAbs = abs;
+    }
+  });
+  if (fallbackAbs) return fallbackAbs;
+
+  return undefined;
 }
 
 async function runPool<T>(items: string[], limit: number, worker: (item: string) => Promise<T | void>, shouldContinue: () => boolean) {
@@ -122,7 +174,10 @@ async function scrapeEventPage(url: string, userAgent: string, pageDebug?: Array
     for (const e of events) {
       if (!e.name || !e.startDate) continue;
       const iso = toLondonISO(e.startDate);
-      const booking = resolveUrl(e.offersUrl || e.url, url) || url;
+let booking = resolveUrl(e.offersUrl || e.url, url);
+      if (!booking) {
+        booking = findBookingUrl($, url) || url;
+      }
       jsonLdEvents.push({
         id: makeId(VENUE_ID, iso, e.name),
         title: e.name,
@@ -197,8 +252,7 @@ async function scrapeEventPage(url: string, userAgent: string, pageDebug?: Array
     }
   });
   if (isoSet.size > 0) {
-    const bookHref = $("a[href*='ticket'], a[href*='book'], a[href*='buy']").first().attr("href");
-    const bookingUrl = resolveUrl(bookHref, url) || url;
+const bookingUrl = findBookingUrl($, url) || url;
     const rows = Array.from(isoSet).map((iso) => ({
       id: makeId(VENUE_ID, iso, title),
       title,
@@ -219,8 +273,7 @@ async function scrapeEventPage(url: string, userAgent: string, pageDebug?: Array
     if (dt) times.add(toLondonISO(dt));
   });
 
-  const bookHref = $("a[href*='ticket'], a[href*='book'], a[href*='buy']").first().attr("href");
-  const bookingUrl = resolveUrl(bookHref, url) || url;
+const bookingUrl = findBookingUrl($, url) || url;
 
   if (times.size === 0) {
     pageDebug?.push({ strategy: "time-datetime", found: 0 });
@@ -362,8 +415,18 @@ await runPool(linkArr, CONCURRENCY, async (url) => {
 }, () => Date.now() <= deadline);
 
 
-  // Dedupe
+// Dedupe
   const map = new Map(rows.map((r) => [r.id, r]));
   const deduped = Array.from(map.values());
+
+  // Stats for debug: booking link coverage
+  const total = deduped.length;
+  const withAnyBooking = deduped.filter((r) => !!r.booking_url).length;
+  const withTicket = deduped.filter((r) => /tickets\.ica\.art/i.test(r.booking_url)).length;
+  const withSource = deduped.filter((r) => !!r.source_url).length;
+  if (debug) {
+    debugObj.stats = { total, withAnyBooking, withTicket, withSource };
+  }
+
   return { rows: deduped, debug: debug ? debugObj : undefined };
 }
