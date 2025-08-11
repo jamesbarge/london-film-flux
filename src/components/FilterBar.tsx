@@ -86,7 +86,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
         {/* View toggle */}
         <ToggleGroup type="single" value={view} onValueChange={v => v && setView(v as "day" | "month")} className="">
           <ToggleGroupItem value="day" className="">Today</ToggleGroupItem>
-          <ToggleGroupItem value="month" className="">Month</ToggleGroupItem>
+          
         </ToggleGroup>
       </div>
     </section>;
