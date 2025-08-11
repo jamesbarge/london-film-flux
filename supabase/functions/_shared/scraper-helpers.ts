@@ -149,11 +149,10 @@ export async function upsertScreenings(rows: ScreeningRow[]) {
   for (const row of rows) {
     try {
       const filmId = await getOrCreateFilm(supabase, row.title, row.year);
-
       const cinemaUuid = await resolveCinemaId(supabase, row.venue_id);
 
+      // Let Postgres generate the UUID id and upsert by natural key
       const payload = {
-        id: row.id,
         cinema_id: cinemaUuid,
         film_id: filmId,
         start_time: row.start_at,
@@ -163,7 +162,7 @@ export async function upsertScreenings(rows: ScreeningRow[]) {
 
       const { error: upsertErr } = await supabase
         .from("screenings")
-        .upsert(payload, { onConflict: "id" });
+        .upsert(payload, { onConflict: "cinema_id,film_id,start_time" });
 
       if (upsertErr) throw upsertErr;
       successCount++;
