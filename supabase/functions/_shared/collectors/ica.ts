@@ -6,10 +6,11 @@ import {
   toLondonISO,
   detectFormats,
   makeId,
+  sleep,
   type ScreeningRow,
 } from "../scraper-helpers.ts";
 
-const LIST_URL = "https://www.ica.art/films";
+const LIST_URL = "https://www.ica.art/whats-on"; // no /cinema, that 404s
 const VENUE_ID = "ica";
 
 function resolveUrl(href: string | undefined, base: string): string | undefined {
@@ -105,28 +106,96 @@ async function scrapeEventPage(url: string, userAgent: string): Promise<Screenin
 }
 
 export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]> {
-  const listHtml = await fetchHtml(LIST_URL, userAgent);
-  const $ = load(listHtml);
-  const linkSet = new Set<string>();
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href") || "";
-    if (!/\/films(\/|$)/.test(href)) return;
-    const full = resolveUrl(href, LIST_URL);
-    if (!full) return;
-    if (/\/films\/?$/.test(full)) return; // skip the listing root
-    linkSet.add(full);
-  });
-  const links = Array.from(linkSet).slice(0, 200);
+  const rows: ScreeningRow[] = [];
 
-  const allRows: ScreeningRow[] = [];
+  // fetch list page
+  const html = await fetchHtml(LIST_URL, userAgent);
+  console.log("ICA list fetch ok", { url: LIST_URL, len: html.length });
+
+  const $ = load(html);
+
+  // collect candidate links from cards and inline links
+  const links = new Set<string>();
+  $('a[href*="/whats-on/"]').each((_, a) => {
+    const href = $(a).attr("href") || "";
+    const text = $(a).text().trim().toLowerCase();
+
+    // only keep items that look like cinema events
+    const tag = $(a).closest("[class*='card'], article, li").text().toLowerCase();
+    const isCinema = tag.includes("cinema") || text.includes("cinema");
+
+    if (isCinema && href && !href.endsWith("#")) {
+      links.add(href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString());
+    }
+  });
+
+  console.log("ICA candidate links", { count: links.size });
+
+  // visit each event page, prefer JSON-LD Event
   for (const url of links) {
     try {
-      const rows = await scrapeEventPage(url, userAgent);
-      if (rows && rows.length > 0) allRows.push(...rows);
-    } catch {}
+      const page = await fetchHtml(url, userAgent);
+      const $$ = load(page);
+
+      let added = 0;
+
+      $$('script[type="application/ld+json"]').each((_, s) => {
+        try {
+          const data = JSON.parse($$(s).text());
+          const arr = Array.isArray(data) ? data : [data];
+          for (const it of arr) {
+            if (it && it["@type"] === "Event" && it.name && it.startDate) {
+              const title = String(it.name).trim();
+              const iso = toLondonISO(it.startDate);
+              const book = it.offers?.url || it.url || url;
+
+              rows.push({
+                id: makeId("ica", iso, title),
+                title,
+                venue_id: "ica",
+                start_at: iso,
+                format: detectFormats(JSON.stringify(it)),
+                booking_url: book.startsWith("http") ? book : new URL(book, url).toString(),
+                source_url: url,
+              });
+              added++;
+            }
+          }
+        } catch {}
+      });
+
+      // fallback to DOM if no JSON LD
+      if (added === 0) {
+        const title = $$("h1").first().text().trim();
+        const pageText = $$("body").text();
+        $$("time[datetime]").each((_, t) => {
+          const dt = $$(t).attr("datetime");
+          if (!dt || !title) return;
+          const iso = toLondonISO(dt);
+          const book =
+            $$('a[href*="ticket"], a[href*="book"], a[href*="buy"]').first().attr("href") || url;
+
+          rows.push({
+            id: makeId("ica", iso, title),
+            title,
+            venue_id: "ica",
+            start_at: iso,
+            format: detectFormats(pageText),
+            booking_url: book?.startsWith("http") ? book : new URL(book || "", url).toString(),
+            source_url: url,
+          });
+          added++;
+        });
+      }
+
+      console.log("ICA page parsed", { url, added });
+      await sleep(350);
+    } catch (e) {
+      console.warn("ICA page error", { url, e: String(e) });
+    }
   }
 
-  const dedup = new Map<string, ScreeningRow>();
-  for (const r of allRows) dedup.set(r.id, r);
-  return Array.from(dedup.values());
+  // de dup by id
+  const map = new Map(rows.map(r => [r.id, r]));
+  return Array.from(map.values());
 }
