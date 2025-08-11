@@ -1,11 +1,6 @@
-// Shared helpers for scrapers used by Edge Functions
-// Deno/Edge compatible utilities only (no Node APIs)
 
-// Supabase client for Edge Functions (Deno ESM import)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-// Timezone helpers (date-fns-tz v3 with named exports per release notes)
 import { fromZonedTime } from "npm:date-fns-tz@3.0.0";
 
 export type ScreeningRow = {
@@ -22,6 +17,52 @@ export type ScreeningRow = {
 };
 
 export const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+// Firecrawl fallback for blocked pages (403/429) or exhausted retries
+async function fetchViaFirecrawl(url: string): Promise<string> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) throw new Error("FIRECRAWL_API_KEY not set");
+
+  console.warn("fetchHtml: using Firecrawl fallback", { url });
+
+  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["html"],
+      onlyMainContent: false,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Firecrawl HTTP ${res.status}`);
+  }
+
+  // Try to robustly extract HTML from various possible response shapes
+  const data: any = await res.json();
+  const candidates = [
+    data?.data?.html,
+    Array.isArray(data?.data) ? data?.data?.[0]?.html : undefined,
+    data?.html,
+    Array.isArray(data) ? data?.[0]?.html : undefined,
+    data?.data?.content,
+    data?.content,
+  ].filter((v) => typeof v === "string" && v.trim().length > 0);
+
+  if (candidates.length > 0) {
+    return String(candidates[0]);
+  }
+
+  console.warn("Firecrawl fallback: no explicit html field found; returning empty string", {
+    url,
+    keys: Object.keys(data || {}),
+  });
+  return "";
+}
 
 export async function fetchHtml(url: string, userAgent: string): Promise<string> {
   const origin = (() => {
@@ -44,14 +85,25 @@ export async function fetchHtml(url: string, userAgent: string): Promise<string>
   };
 
   let lastErr: any = null;
+  let lastStatus: number | null = null;
+
   for (let attempt = 0; attempt < 3; attempt++) {
     const ua = uaPool[attempt % uaPool.length] || headersBase["user-agent"];
     const headers = { ...headersBase, "user-agent": ua };
     try {
       const res = await fetch(url, { headers });
       if (!res.ok) {
+        lastStatus = res.status;
         lastErr = new Error(`HTTP ${res.status} fetching ${url}`);
         console.error("fetchHtml failed", { url, status: res.status, attempt: attempt + 1 });
+        // If clearly blocked and Firecrawl available, try immediately
+        if ((res.status === 403 || res.status === 429) && Deno.env.get("FIRECRAWL_API_KEY")) {
+          try {
+            return await fetchViaFirecrawl(url);
+          } catch (fcErr) {
+            console.error("Firecrawl fallback failed", { url, error: (fcErr as Error)?.message });
+          }
+        }
       } else {
         return await res.text();
       }
@@ -59,9 +111,19 @@ export async function fetchHtml(url: string, userAgent: string): Promise<string>
       lastErr = e;
       console.error("fetchHtml error", { url, attempt: attempt + 1, error: (e as Error)?.message });
     }
-    // Exponential backoff: 500ms, 1500ms, 3000ms
+    // Exponential backoff: 500ms, 1500ms, 4500ms
     await sleep(500 * Math.pow(3, attempt));
   }
+
+  // After retries, if blocked or failed and Firecrawl is configured, try once
+  if ((lastStatus === 403 || lastStatus === 429 || lastErr) && Deno.env.get("FIRECRAWL_API_KEY")) {
+    try {
+      return await fetchViaFirecrawl(url);
+    } catch (fcErr) {
+      console.error("Firecrawl fallback (post-retries) failed", { url, error: (fcErr as Error)?.message });
+    }
+  }
+
   throw lastErr ?? new Error(`Failed to fetch ${url}`);
 }
 
