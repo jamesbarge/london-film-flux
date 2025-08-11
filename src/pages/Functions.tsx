@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,13 +52,20 @@ export default function FunctionsPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container py-8">
-          <h1 className="text-3xl tracking-tight title-sheen text-left md:text-3xl font-semibold">
-            Run Supabase Edge Functions
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl">
-            Trigger your scraping functions directly from the browser. Results display inline; detailed logs are in the Supabase dashboard.
-          </p>
+        <div className="container py-8 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl tracking-tight title-sheen text-left md:text-3xl font-semibold">
+              Run Supabase Edge Functions
+            </h1>
+            <p className="text-muted-foreground mt-2 max-w-2xl">
+              Trigger your scraping functions directly from the browser. Results display inline; detailed logs are in the Supabase dashboard.
+            </p>
+          </div>
+          <nav>
+            <Link to="/" className="text-sm underline underline-offset-4 hover:opacity-80">
+              Back to Home
+            </Link>
+          </nav>
         </div>
       </header>
 
