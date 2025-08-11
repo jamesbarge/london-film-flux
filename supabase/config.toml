@@ -1,5 +1,7 @@
+project_id = "dlhkvzslowervdyzideq"
 
-# ... keep existing code (project_id and [functions.generate_blurb]) the same ...
+[functions.generate_blurb]
+verify_jwt = false
 
 [functions.scrape_ica]
 verify_jwt = false

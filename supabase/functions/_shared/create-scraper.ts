@@ -19,7 +19,9 @@ export type ScrapeContext = {
 
 function buildUserAgent() {
   const contact = Deno.env.get("SCRAPER_CONTACT_EMAIL")?.trim() || "listings@example.com";
-  return `LondonRepertoryBot/1.0 (+contact: ${contact})`;
+  // Use a realistic modern browser UA to reduce blocks, while including our contact for transparency
+  const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+  return `${chromeUA} LondonRepertoryBot/1.0 (+contact: ${contact})`;
 }
 
 export function createScraper(

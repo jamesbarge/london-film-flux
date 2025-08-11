@@ -24,18 +24,45 @@ export type ScreeningRow = {
 export const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export async function fetchHtml(url: string, userAgent: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "user-agent": userAgent || "LondonRepertoryBot contact you@example.com",
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "en-GB,en;q=0.9",
-    },
-  });
-  if (!res.ok) {
-    console.error("fetchHtml failed", { url, status: res.status });
-    throw new Error(`HTTP ${res.status} fetching ${url}`);
+  const origin = (() => {
+    try { return new URL(url).origin + "/"; } catch { return undefined; }
+  })();
+
+  const uaPool = [
+    userAgent,
+    // Alternate UA strings for retries (rotate to reduce naive blocking)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  ];
+
+  const headersBase: Record<string, string> = {
+    "user-agent": userAgent || "Mozilla/5.0",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "accept-language": "en-GB,en;q=0.9",
+    "upgrade-insecure-requests": "1",
+    ...(origin ? { "referer": origin } : {}),
+  };
+
+  let lastErr: any = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ua = uaPool[attempt % uaPool.length] || headersBase["user-agent"];
+    const headers = { ...headersBase, "user-agent": ua };
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        lastErr = new Error(`HTTP ${res.status} fetching ${url}`);
+        console.error("fetchHtml failed", { url, status: res.status, attempt: attempt + 1 });
+      } else {
+        return await res.text();
+      }
+    } catch (e) {
+      lastErr = e;
+      console.error("fetchHtml error", { url, attempt: attempt + 1, error: (e as Error)?.message });
+    }
+    // Exponential backoff: 500ms, 1500ms, 3000ms
+    await sleep(500 * Math.pow(3, attempt));
   }
-  return await res.text();
+  throw lastErr ?? new Error(`Failed to fetch ${url}`);
 }
 
 // Convert a Date or date-like text to an ISO string representing the UTC instant

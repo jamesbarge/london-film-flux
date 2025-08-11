@@ -175,7 +175,24 @@ async function parseCardsOnPage(url: string, userAgent: string): Promise<Screeni
 }
 
 export async function collectBfiRows(userAgent: string): Promise<ScreeningRow[]> {
-  const listHtml = await fetchHtml(LIST_URL, userAgent);
+  const startUrls = [
+    LIST_URL,
+    "https://whatson.bfi.org.uk/southbank/",
+    "https://whatson.bfi.org.uk/",
+  ];
+
+  let listHtml: string | null = null;
+  let firstErr: any = null;
+  for (const u of startUrls) {
+    try {
+      listHtml = await fetchHtml(u, userAgent);
+      if (listHtml) break;
+    } catch (e) {
+      firstErr = firstErr ?? e;
+    }
+  }
+  if (!listHtml) throw firstErr ?? new Error("Failed to load BFI listing pages");
+
   const $ = load(listHtml);
   const linkSet = new Set<string>();
 
