@@ -9,7 +9,7 @@ import {
   type ScreeningRow,
 } from "../scraper-helpers.ts";
 
-const LIST_URL = "https://www.ica.art/whats-on/cinema";
+const LIST_URL = "https://www.ica.art/films";
 const VENUE_ID = "ica";
 
 function resolveUrl(href: string | undefined, base: string): string | undefined {
@@ -110,10 +110,10 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
   const linkSet = new Set<string>();
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href") || "";
-    if (!/\/whats-on\//.test(href)) return;
+    if (!/\/films(\/|$)/.test(href)) return;
     const full = resolveUrl(href, LIST_URL);
     if (!full) return;
-    if (/\/whats-on\/cinema\/?$/.test(full)) return;
+    if (/\/films\/?$/.test(full)) return; // skip the listing root
     linkSet.add(full);
   });
   const links = Array.from(linkSet).slice(0, 200);
