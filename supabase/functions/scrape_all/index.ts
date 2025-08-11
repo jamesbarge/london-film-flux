@@ -1,4 +1,4 @@
-// Aggregate scraper that runs all venue collectors with small delays, merges and upserts once
+// Aggregate scraper that runs all venue collectors with small delays, merges and upserts once // redeploy
 
 import { createScraper, type ScrapeContext } from "../_shared/create-scraper.ts";
 import { upsertScreenings, sleep, type ScreeningRow } from "../_shared/scraper-helpers.ts";

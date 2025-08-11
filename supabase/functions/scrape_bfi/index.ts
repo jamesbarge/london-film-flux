@@ -1,4 +1,4 @@
-// Wrapper for BFI Southbank scraper using shared createScraper; delegates logic to logic.ts
+// Wrapper for BFI Southbank scraper using shared createScraper; delegates logic to logic.ts // redeploy
 import { createScraper, type ScrapeContext, type ScrapeResult } from "../_shared/create-scraper.ts";
 import { upsertScreenings } from "../_shared/scraper-helpers.ts";
 import { collectBfiRows } from "../_shared/collectors/bfi.ts";
