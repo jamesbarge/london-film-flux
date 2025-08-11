@@ -122,11 +122,15 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
                     )}
                   </div>
                   <div className="shrink-0">
-                    {(s as any).bookingUrl && (
+                    {(s as any).bookingUrl ? (
                       <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
                         <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
                           Book
                         </a>
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
+                        Book
                       </Button>
                     )}
                   </div>
@@ -173,11 +177,15 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
               )}
             </div>
             <div className="shrink-0">
-              {(s as any).bookingUrl && (
+              {(s as any).bookingUrl ? (
                 <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
                   <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
                     Book
                   </a>
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
+                  Book
                 </Button>
               )}
             </div>
