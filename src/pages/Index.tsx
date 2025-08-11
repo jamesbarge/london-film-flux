@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ListingsPage from "@/components/ListingsPage";
 const Index = () => {
@@ -15,10 +16,15 @@ const Index = () => {
   }, []);
   return <div className="min-h-screen">
       <header className="border-b border-border">
-        <div className="container py-8">
+        <div className="container py-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl tracking-tight title-sheen text-left md:text-3xl font-semibold">
             London Repertory Cinema Listings
           </h1>
+          <nav>
+            <Link to="/functions" className="text-sm underline underline-offset-4 hover:opacity-80">
+              Run Functions
+            </Link>
+          </nav>
         </div>
       </header>
 
