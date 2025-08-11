@@ -42,7 +42,7 @@ function cleanAbsolute(urlStr?: string): string | undefined {
 
 function isDetailLink(u: string): boolean {
   // Only accept detail pages like /films/<slug> or /whats-on/<slug>
-  return \/\/(films|whats-on)\/[^\/\?#]+$\/.test(u);
+  return /\/(films|whats-on)\/[^\/\?#]+$/.test(u);
 }
 
 // Try to find the most reliable external booking URL on the page (prefer tickets.ica.art)
