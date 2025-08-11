@@ -23,6 +23,41 @@ function resolveUrl(href: string | undefined, base: string): string | undefined 
   }
 }
 
+// Performance helpers and link filtering utilities
+const ICA_BASE = "https://www.ica.art";
+
+function cleanAbsolute(urlStr?: string): string | undefined {
+  if (!urlStr) return undefined;
+  try {
+    const u = new URL(urlStr);
+    // Keep only ICA domain and strip query/hash
+    if (!/(^|\.)ica\.art$/.test(u.hostname)) return undefined;
+    u.hash = "";
+    u.search = "";
+    return u.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function isDetailLink(u: string): boolean {
+  // Only accept detail pages like /films/<slug> or /whats-on/<slug>
+  return /\/(films|whats-on)\/[^\/\?#]+$/.test(u);
+}
+
+async function runPool<T>(items: string[], limit: number, worker: (item: string) => Promise<T | void>, shouldContinue: () => boolean) {
+  let i = 0;
+  const max = Math.max(1, Math.min(limit, items.length));
+  const runners = Array.from({ length: max }, async () => {
+    while (shouldContinue()) {
+      const idx = i++;
+      if (idx >= items.length) break;
+      await worker(items[idx]);
+    }
+  });
+  await Promise.all(runners as Promise<any>[]);
+}
+
 function extractEventsFromJsonLd(jsonText: string): Array<{ name?: string; startDate?: string; url?: string; offersUrl?: string }> {
   const out: Array<{ name?: string; startDate?: string; url?: string; offersUrl?: string }> = [];
   try {
@@ -233,32 +268,38 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
 
   const $ = load(html);
 
-  // collect candidate links from Films page
-  const links = new Set<string>();
-  $('a[href*="/films/"]').each((_, a) => {
-    const href = $(a).attr("href")?.trim() || "";
-    if (!href || href.endsWith("#")) return;
-    const absolute = href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString();
-    // skip the index listing itself
-    if (/\/films\/?$/.test(absolute)) return;
-    links.add(absolute);
-  });
+// collect candidate links from Films/What's On pages (detail pages only)
+const links = new Set<string>();
+$('a[href*="/films/"], a[href*="/whats-on/"]').each((_, a) => {
+  const href = $(a).attr("href")?.trim() || "";
+  if (!href || href.endsWith("#")) return;
+  const absolute = resolveUrl(href, ICA_BASE);
+  const cleaned = cleanAbsolute(absolute);
+  if (!cleaned || !isDetailLink(cleaned)) return;
+  links.add(cleaned);
+});
 
-  const samples = Array.from(links).slice(0, 3);
-  console.log("ICA candidate links", { count: links.size, samples });
+const linkArr = Array.from(links);
+const samples = linkArr.slice(0, 3);
+console.log("ICA candidate links", { count: linkArr.length, samples });
 
-  // visit each event page using the robust parser
-  for (const url of links) {
-    try {
-      const events = await scrapeEventPage(url, userAgent);
-      const add = events?.length ?? 0;
-      if (add > 0) rows.push(...(events as ScreeningRow[]));
-      console.log("ICA page parsed", { url, added: add });
-      await sleep(350);
-    } catch (e) {
-      console.warn("ICA page error", { url, e: String(e) });
-    }
+// Visit pages with throttled concurrency and a time budget
+const CONCURRENCY = 6;
+const BUDGET_MS = 70_000; // leave ~80s for DB upsert
+const deadline = Date.now() + BUDGET_MS;
+
+await runPool(linkArr, CONCURRENCY, async (url) => {
+  if (Date.now() > deadline) return;
+  try {
+    const events = await scrapeEventPage(url, userAgent);
+    const add = events?.length ?? 0;
+    if (add > 0) rows.push(...(events as ScreeningRow[]));
+    console.log("ICA page parsed", { url, added: add });
+  } catch (e) {
+    console.warn("ICA page error", { url, e: String(e) });
   }
+}, () => Date.now() <= deadline);
+
 
   // de dup by id
   const map = new Map(rows.map((r) => [r.id, r]));
@@ -281,45 +322,45 @@ export async function collectIca(params: { userAgent: string; debug?: boolean })
     try {
       const html = await fetchHtml(url, userAgent);
       debugObj.indexPagesTried.push({ url, ok: true, len: html.length });
-      const $ = load(html);
-      const before = linkSet.size;
-      // gather films and whats-on links
-      $('a[href*="/films/"]').each((_, a) => {
-        const href = $(a).attr("href")?.trim() || "";
-        if (!href || href.endsWith("#")) return;
-        const absolute = href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString();
-        if (/\/films\/?$/.test(absolute)) return; // skip index
-        linkSet.add(absolute);
-      });
-      $('a[href*="/whats-on/"]').each((_, a) => {
-        const href = $(a).attr("href")?.trim() || "";
-        if (!href || href.endsWith("#")) return;
-        const absolute = href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString();
-        if (/\/whats-on\/?$/.test(absolute)) return;
-        linkSet.add(absolute);
-      });
-      const after = linkSet.size;
-      const added = after - before;
-      debugObj.indexLinkCounts.push({ url, added });
-      debugObj.samples[url] = Array.from(linkSet).slice(0, 3);
+const $ = load(html);
+const before = linkSet.size;
+// gather films and whats-on detail links
+$('a[href*="/films/"], a[href*="/whats-on/"]').each((_, a) => {
+  const href = $(a).attr("href")?.trim() || "";
+  if (!href || href.endsWith("#")) return;
+  const absolute = resolveUrl(href, ICA_BASE);
+  const cleaned = cleanAbsolute(absolute);
+  if (!cleaned || !isDetailLink(cleaned)) return;
+  linkSet.add(cleaned);
+});
+const after = linkSet.size;
+const added = after - before;
+debugObj.indexLinkCounts.push({ url, added });
+debugObj.samples[url] = Array.from(linkSet).slice(0, 3);
     } catch (e) {
       debugObj.indexPagesTried.push({ url, ok: false, error: String(e) });
     }
   }
 
-  // Visit pages
-  for (const url of linkSet) {
-    const pageDbg: Array<{ strategy: string; found: number }> = [];
-    try {
-      const events = await scrapeEventPage(url, userAgent, pageDbg);
-      const add = events?.length ?? 0;
-      if (add > 0) rows.push(...(events as ScreeningRow[]));
-      debugObj.perPage.push({ url, strategies: pageDbg, eventsFound: add });
-      await sleep(300 + Math.floor(Math.random() * 200));
-    } catch (e) {
-      debugObj.perPage.push({ url, error: String(e) });
-    }
+// Visit pages with throttled concurrency and budget
+const linkArr = Array.from(linkSet);
+const CONCURRENCY = 6;
+const BUDGET_MS = 70_000;
+const deadline = Date.now() + BUDGET_MS;
+
+await runPool(linkArr, CONCURRENCY, async (url) => {
+  if (Date.now() > deadline) return;
+  const pageDbg: Array<{ strategy: string; found: number }> = [];
+  try {
+    const events = await scrapeEventPage(url, userAgent, pageDbg);
+    const add = events?.length ?? 0;
+    if (add > 0) rows.push(...(events as ScreeningRow[]));
+    debugObj.perPage.push({ url, strategies: pageDbg, eventsFound: add });
+  } catch (e) {
+    debugObj.perPage.push({ url, error: String(e) });
   }
+}, () => Date.now() <= deadline);
+
 
   // Dedupe
   const map = new Map(rows.map((r) => [r.id, r]));
