@@ -1,9 +1,15 @@
 // Wrapper for ICA scraper using shared createScraper; delegates logic to logic.ts // redeploy
 import { createScraper, type ScrapeContext, type ScrapeResult } from "../_shared/create-scraper.ts";
 import { upsertScreenings } from "../_shared/scraper-helpers.ts";
-import { collectIcaRows } from "../_shared/collectors/ica.ts";
+import { collectIcaRows, collectIca } from "../_shared/collectors/ica.ts";
 
-async function scrapeIca({ userAgent }: ScrapeContext): Promise<ScrapeResult> {
+async function scrapeIca({ userAgent, payload }: ScrapeContext): Promise<ScrapeResult & { debug?: any }> {
+  const debug = !!payload?.debug;
+  if (debug) {
+    const { rows, debug: dbg } = await collectIca({ userAgent, debug: true });
+    const { inserted } = await upsertScreenings(rows);
+    return { scraped: rows.length, inserted, debug: dbg };
+  }
   const rows = await collectIcaRows(userAgent);
   const { inserted } = await upsertScreenings(rows);
   return { scraped: rows.length, inserted };

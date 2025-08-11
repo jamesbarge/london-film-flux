@@ -23,6 +23,7 @@ export default function FunctionsPage() {
   const [running, setRunning] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [debug, setDebug] = useState(false);
 
   useEffect(() => {
     document.title = "Run Supabase Edge Functions | Admin";
@@ -36,7 +37,7 @@ export default function FunctionsPage() {
     setRunning((s) => ({ ...s, [name]: true }));
     setErrors((s) => ({ ...s, [name]: "" }));
     try {
-      const { data, error } = await supabase.functions.invoke(name, { body: {} });
+      const { data, error } = await supabase.functions.invoke(name, { body: debug ? { debug: true } : {} });
       if (error) throw error;
       setResults((r) => ({ ...r, [name]: data }));
       toast({ title: `${name} completed`, description: "Check the result below.", duration: 2500 });
@@ -70,6 +71,10 @@ export default function FunctionsPage() {
       </header>
 
       <main className="container py-10">
+        <div className="mb-6 flex items-center gap-2">
+          <input id="debug" type="checkbox" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />
+          <label htmlFor="debug" className="text-sm text-muted-foreground">Debug mode (returns diagnostics from scraper)</label>
+        </div>
         <div className="grid gap-6 md:grid-cols-2">
           {sortedFunctions.map((fn) => (
             <Card key={fn.id}>
