@@ -1,6 +1,6 @@
 // ICA collector: parses ICA events and returns ScreeningRow[] (no upsert, no Deno.serve)
 
-import { load } from "cheerio";
+import { load } from "npm:cheerio@1.0.0-rc.12";
 import {
   fetchHtml,
   toLondonISO,

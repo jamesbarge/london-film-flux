@@ -1,6 +1,6 @@
 // BFI Southbank collector: parses Calendar/programme pages and returns ScreeningRow[]
 
-import { load } from "cheerio";
+import { load } from "npm:cheerio@1.0.0-rc.12";
 import {
   fetchHtml,
   toLondonISO,
