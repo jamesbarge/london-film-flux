@@ -108,9 +108,28 @@ async function scrapeEventPage(url: string, userAgent: string): Promise<Screenin
 export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]> {
   const rows: ScreeningRow[] = [];
 
-  // fetch list page
-  const html = await fetchHtml(LIST_URL, userAgent);
-  console.log("ICA list fetch ok", { url: LIST_URL, len: html.length });
+  // fetch list page with simple fallback (with and without trailing slash)
+  const listCandidates = [
+    LIST_URL,
+    LIST_URL.endsWith("/") ? LIST_URL.slice(0, -1) : `${LIST_URL}/`,
+  ];
+
+  let html = "";
+  let fetchedFrom = "";
+  for (const u of listCandidates) {
+    try {
+      html = await fetchHtml(u, userAgent);
+      fetchedFrom = u;
+      break;
+    } catch (e) {
+      console.warn("ICA list fetch failed", { url: u, e: String(e) });
+    }
+  }
+  if (!html) {
+    console.error("ICA list fetch gave no HTML after fallbacks", { tried: listCandidates });
+    return [];
+  }
+  console.log("ICA list fetch ok", { url: fetchedFrom, len: html.length });
 
   const $ = load(html);
 
@@ -129,66 +148,16 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
     }
   });
 
-  console.log("ICA candidate links", { count: links.size });
+  const samples = Array.from(links).slice(0, 3);
+  console.log("ICA candidate links", { count: links.size, samples });
 
-  // visit each event page, prefer JSON-LD Event
+  // visit each event page using the robust parser
   for (const url of links) {
     try {
-      const page = await fetchHtml(url, userAgent);
-      const $$ = load(page);
-
-      let added = 0;
-
-      $$('script[type="application/ld+json"]').each((_, s) => {
-        try {
-          const data = JSON.parse($$(s).text());
-          const arr = Array.isArray(data) ? data : [data];
-          for (const it of arr) {
-            if (it && it["@type"] === "Event" && it.name && it.startDate) {
-              const title = String(it.name).trim();
-              const iso = toLondonISO(it.startDate);
-              const book = it.offers?.url || it.url || url;
-
-              rows.push({
-                id: makeId("ica", iso, title),
-                title,
-                venue_id: "ica",
-                start_at: iso,
-                format: detectFormats(JSON.stringify(it)),
-                booking_url: book.startsWith("http") ? book : new URL(book, url).toString(),
-                source_url: url,
-              });
-              added++;
-            }
-          }
-        } catch {}
-      });
-
-      // fallback to DOM if no JSON LD
-      if (added === 0) {
-        const title = $$("h1").first().text().trim();
-        const pageText = $$("body").text();
-        $$("time[datetime]").each((_, t) => {
-          const dt = $$(t).attr("datetime");
-          if (!dt || !title) return;
-          const iso = toLondonISO(dt);
-          const book =
-            $$('a[href*="ticket"], a[href*="book"], a[href*="buy"]').first().attr("href") || url;
-
-          rows.push({
-            id: makeId("ica", iso, title),
-            title,
-            venue_id: "ica",
-            start_at: iso,
-            format: detectFormats(pageText),
-            booking_url: book?.startsWith("http") ? book : new URL(book || "", url).toString(),
-            source_url: url,
-          });
-          added++;
-        });
-      }
-
-      console.log("ICA page parsed", { url, added });
+      const events = await scrapeEventPage(url, userAgent);
+      const add = events?.length ?? 0;
+      if (add > 0) rows.push(...(events as ScreeningRow[]));
+      console.log("ICA page parsed", { url, added: add });
       await sleep(350);
     } catch (e) {
       console.warn("ICA page error", { url, e: String(e) });
@@ -196,6 +165,8 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
   }
 
   // de dup by id
-  const map = new Map(rows.map(r => [r.id, r]));
-  return Array.from(map.values());
+  const map = new Map(rows.map((r) => [r.id, r]));
+  const deduped = Array.from(map.values());
+  console.log("ICA total rows", { before: rows.length, after: deduped.length });
+  return deduped;
 }

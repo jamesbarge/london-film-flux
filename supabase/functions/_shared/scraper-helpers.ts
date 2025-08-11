@@ -27,7 +27,8 @@ export async function fetchHtml(url: string, userAgent: string): Promise<string>
   const res = await fetch(url, {
     headers: {
       "user-agent": userAgent || "LondonRepertoryBot contact you@example.com",
-      accept: "text/html,application/xhtml+xml",
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "accept-language": "en-GB,en;q=0.9",
     },
   });
   if (!res.ok) {
