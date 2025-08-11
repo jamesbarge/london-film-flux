@@ -35,6 +35,7 @@ export type Database = {
       films: {
         Row: {
           created_at: string
+          description: string | null
           id: string
           runtime_mins: number | null
           title: string
@@ -42,6 +43,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
           runtime_mins?: number | null
           title: string
@@ -49,6 +51,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
           runtime_mins?: number | null
           title?: string
@@ -58,30 +61,36 @@ export type Database = {
       }
       screenings: {
         Row: {
+          booking_url: string | null
           cinema_id: string
           created_at: string
           end_time: string | null
           film_id: string
           id: string
           screen: string | null
+          source_url: string | null
           start_time: string
         }
         Insert: {
+          booking_url?: string | null
           cinema_id: string
           created_at?: string
           end_time?: string | null
           film_id: string
           id?: string
           screen?: string | null
+          source_url?: string | null
           start_time: string
         }
         Update: {
+          booking_url?: string | null
           cinema_id?: string
           created_at?: string
           end_time?: string | null
           film_id?: string
           id?: string
           screen?: string | null
+          source_url?: string | null
           start_time?: string
         }
         Relationships: [

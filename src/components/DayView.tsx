@@ -1,7 +1,10 @@
 import React from "react";
 import { format } from "date-fns";
-import { Loader2, Film } from "lucide-react";
+import { Loader2, Film, Wand2 } from "lucide-react";
 import { useScreenings } from "@/hooks/useScreenings";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DayViewProps {
   date?: Date;
@@ -9,7 +12,26 @@ interface DayViewProps {
 }
 
 const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
-  const { data = [], isLoading, isError } = useScreenings(date, cinemaIds);
+  const { data = [], isLoading, isError, refetch } = useScreenings(date, cinemaIds);
+  const { toast } = useToast();
+  const [generating, setGenerating] = React.useState<Record<string, boolean>>({});
+
+  const handleGenerate = async (s: { filmId: string; filmTitle: string }) => {
+    try {
+      setGenerating((g) => ({ ...g, [s.filmId]: true }));
+      const { data, error } = await supabase.functions.invoke("generate_blurb", {
+        body: { filmId: s.filmId, title: s.filmTitle },
+      });
+      if (error) throw error;
+      toast({ title: "Blurb generated", description: `Added a short blurb for ${s.filmTitle}.` });
+      await refetch();
+    } catch (e: any) {
+      console.error("generate_blurb failed", e);
+      toast({ title: "Failed to generate blurb", description: e?.message ?? "Please try again." });
+    } finally {
+      setGenerating((g) => ({ ...g, [s.filmId]: false }));
+    }
+  };
 
   if (!date) {
     return (
@@ -78,6 +100,35 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
                   </time>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{s.filmTitle}</p>
+                    {s.filmDescription ? (
+                      <p className="text-xs text-muted-foreground">
+                        {s.filmDescription.length > 200 ? s.filmDescription.slice(0, 200) + "…" : s.filmDescription}
+                      </p>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleGenerate({ filmId: (s as any).filmId, filmTitle: s.filmTitle })}
+                        disabled={!!(generating as any)[(s as any).filmId]}
+                        aria-label={`Generate blurb for ${s.filmTitle}`}
+                      >
+                        {(generating as any)[(s as any).filmId] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-4 w-4" />
+                        )}
+                        Generate blurb
+                      </Button>
+                    )}
+                  </div>
+                  <div className="shrink-0">
+                    {(s as any).bookingUrl && (
+                      <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
+                        <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
+                          Book
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </li>
               ))}
@@ -100,6 +151,35 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
             <div className="flex-1">
               <p className="text-sm font-medium">{s.filmTitle}</p>
               <p className="text-xs text-muted-foreground">{s.cinemaName}</p>
+              {s.filmDescription ? (
+                <p className="text-xs text-muted-foreground">
+                  {s.filmDescription.length > 200 ? s.filmDescription.slice(0, 200) + "…" : s.filmDescription}
+                </p>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleGenerate({ filmId: (s as any).filmId, filmTitle: s.filmTitle })}
+                  disabled={!!(generating as any)[(s as any).filmId]}
+                  aria-label={`Generate blurb for ${s.filmTitle}`}
+                >
+                  {(generating as any)[(s as any).filmId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4" />
+                  )}
+                  Generate blurb
+                </Button>
+              )}
+            </div>
+            <div className="shrink-0">
+              {(s as any).bookingUrl && (
+                <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
+                  <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
+                    Book
+                  </a>
+                </Button>
+              )}
             </div>
           </li>
         ))}

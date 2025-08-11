@@ -158,6 +158,8 @@ export async function upsertScreenings(rows: ScreeningRow[]) {
         start_time: row.start_at,
         end_time: null as string | null,
         screen: null as string | null,
+        booking_url: row.booking_url || null,
+        source_url: row.source_url || null,
       };
 
       const { error: upsertErr } = await supabase

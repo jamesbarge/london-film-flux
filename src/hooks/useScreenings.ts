@@ -6,8 +6,11 @@ export type ScreeningItem = {
   id: string;
   timeISO: string;
   filmTitle: string;
+  filmId: string;
+  filmDescription?: string | null;
   cinemaName: string;
   cinemaId: string;
+  bookingUrl?: string | null;
 };
 
 export function useScreenings(date: Date | undefined, cinemaIds: string[]) {
@@ -24,7 +27,7 @@ export function useScreenings(date: Date | undefined, cinemaIds: string[]) {
     queryFn: async () => {
       const query = (supabase as any)
         .from("screenings")
-        .select("id,start_time,cinema_id,film_id,film:films(id,title),cinema:cinemas(id,name)")
+        .select("id,start_time,cinema_id,booking_url,film_id,film:films(id,title,description),cinema:cinemas(id,name)")
         .gte("start_time", from!)
         .lt("start_time", to!)
         .order("start_time", { ascending: true });
@@ -40,8 +43,11 @@ export function useScreenings(date: Date | undefined, cinemaIds: string[]) {
         id: row.id,
         timeISO: row.start_time,
         filmTitle: row.film?.title ?? "Untitled",
+        filmId: row.film?.id ?? row.film_id,
+        filmDescription: row.film?.description ?? null,
         cinemaName: row.cinema?.name ?? "Unknown cinema",
         cinemaId: row.cinema_id,
+        bookingUrl: row.booking_url ?? null,
       }));
     },
     staleTime: 1000 * 60, // 1 min
