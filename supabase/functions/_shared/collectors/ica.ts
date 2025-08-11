@@ -133,19 +133,15 @@ export async function collectIcaRows(userAgent: string): Promise<ScreeningRow[]>
 
   const $ = load(html);
 
-  // collect candidate links from cards and inline links
+  // collect candidate links broadly from what's-on page (don't over-filter; event pages will be validated later)
   const links = new Set<string>();
-  $('a[href*="/whats-on/"]').each((_, a) => {
-    const href = $(a).attr("href") || "";
-    const text = $(a).text().trim().toLowerCase();
-
-    // only keep items that look like cinema events
-    const tag = $(a).closest("[class*='card'], article, li").text().toLowerCase();
-    const isCinema = tag.includes("cinema") || text.includes("cinema");
-
-    if (isCinema && href && !href.endsWith("#")) {
-      links.add(href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString());
-    }
+  $('a[href*="/whats-on"]').each((_, a) => {
+    const href = $(a).attr("href")?.trim() || "";
+    if (!href || href.endsWith("#")) return;
+    const absolute = href.startsWith("http") ? href : new URL(href, "https://www.ica.art").toString();
+    // skip the index listing itself
+    if (/\/whats-on\/?$/.test(absolute)) return;
+    links.add(absolute);
   });
 
   const samples = Array.from(links).slice(0, 3);

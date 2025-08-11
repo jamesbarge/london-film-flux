@@ -13,7 +13,7 @@ export type ScreeningRow = {
   title: string;
   director?: string;
   year?: number;
-  venue_id: string; // maps to cinemas.id
+  venue_id: string; // venue slug (e.g., "ica", "bfi-southbank")
   start_at: string; // ISO string (UTC) for screenings.start_time
   format?: string;
   booking_url: string;
@@ -91,6 +91,28 @@ function getServiceClient(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+// Map venue slugs to cinema names in DB
+const CINEMA_SLUG_TO_NAME: Record<string, string> = {
+  "ica": "ICA",
+  "bfi-southbank": "BFI Southbank",
+};
+
+const cinemaIdCache = new Map<string, string>();
+
+async function resolveCinemaId(supabase: SupabaseClient, slug: string): Promise<string> {
+  if (cinemaIdCache.has(slug)) return cinemaIdCache.get(slug)!;
+  const name = CINEMA_SLUG_TO_NAME[slug] ?? slug;
+  const { data, error } = await supabase
+    .from("cinemas")
+    .select("id, name")
+    .eq("name", name)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error(`Cinema not found for slug '${slug}' (expected name '${name}')`);
+  cinemaIdCache.set(slug, data.id as string);
+  return data.id as string;
+}
+
 async function getOrCreateFilm(
   supabase: SupabaseClient,
   title: string,
@@ -128,9 +150,11 @@ export async function upsertScreenings(rows: ScreeningRow[]) {
     try {
       const filmId = await getOrCreateFilm(supabase, row.title, row.year);
 
+      const cinemaUuid = await resolveCinemaId(supabase, row.venue_id);
+
       const payload = {
         id: row.id,
-        cinema_id: row.venue_id,
+        cinema_id: cinemaUuid,
         film_id: filmId,
         start_time: row.start_at,
         end_time: null as string | null,
@@ -144,6 +168,7 @@ export async function upsertScreenings(rows: ScreeningRow[]) {
       if (upsertErr) throw upsertErr;
       successCount++;
     } catch (e: any) {
+      console.warn("upsertScreenings row failed", { id: row.id, venue: row.venue_id, error: e?.message ?? String(e) });
       errors.push({ id: row.id, error: e?.message ?? String(e) });
     }
   }
