@@ -1,6 +1,6 @@
 import React from "react";
 import { format } from "date-fns";
-import { Loader2, Film, Wand2 } from "lucide-react";
+import { Loader2, Film, Wand2, ExternalLink } from "lucide-react";
 import { useScreenings } from "@/hooks/useScreenings";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -120,20 +120,27 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
                         Generate blurb
                       </Button>
                     )}
-                  </div>
-                  <div className="shrink-0">
-                    {(s as any).bookingUrl ? (
-                      <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
-                        <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
-                          Book
-                        </a>
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
-                        Book
-                      </Button>
-                    )}
-                  </div>
+                   </div>
+                   <div className="shrink-0 flex gap-2">
+                     {s.letterboxdUrl && (
+                       <Button asChild size="sm" variant="outline" aria-label={`View ${s.filmTitle} on Letterboxd`}>
+                         <a href={s.letterboxdUrl} target="_blank" rel="noopener noreferrer">
+                           <ExternalLink className="h-4 w-4" />
+                         </a>
+                       </Button>
+                     )}
+                     {(s as any).bookingUrl ? (
+                       <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
+                         <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
+                           Book
+                         </a>
+                       </Button>
+                     ) : (
+                       <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
+                         Book
+                       </Button>
+                     )}
+                   </div>
                 </li>
               ))}
             </ul>
@@ -175,20 +182,27 @@ const DayView: React.FC<DayViewProps> = ({ date, cinemaIds }) => {
                   Generate blurb
                 </Button>
               )}
-            </div>
-            <div className="shrink-0">
-              {(s as any).bookingUrl ? (
-                <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
-                  <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
-                    Book
-                  </a>
-                </Button>
-              ) : (
-                <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
-                  Book
-                </Button>
-              )}
-            </div>
+             </div>
+             <div className="shrink-0 flex gap-2">
+               {s.letterboxdUrl && (
+                 <Button asChild size="sm" variant="outline" aria-label={`View ${s.filmTitle} on Letterboxd`}>
+                   <a href={s.letterboxdUrl} target="_blank" rel="noopener noreferrer">
+                     <ExternalLink className="h-4 w-4" />
+                   </a>
+                 </Button>
+               )}
+               {(s as any).bookingUrl ? (
+                 <Button asChild size="sm" variant="secondary" aria-label={`Book ${s.filmTitle}`}>
+                   <a href={(s as any).bookingUrl} target="_blank" rel="noopener noreferrer">
+                     Book
+                   </a>
+                 </Button>
+               ) : (
+                 <Button size="sm" variant="secondary" disabled aria-disabled="true" title="Booking link not available yet">
+                   Book
+                 </Button>
+               )}
+             </div>
           </li>
         ))}
       </ul>
