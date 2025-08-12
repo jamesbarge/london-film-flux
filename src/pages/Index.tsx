@@ -20,7 +20,10 @@ const Index = () => {
           <h1 className="text-3xl tracking-tight title-sheen text-left md:text-3xl font-semibold">
             London Repertory Cinema Listings
           </h1>
-          <nav>
+          <nav className="flex gap-4">
+            <Link to="/import" className="text-sm underline underline-offset-4 hover:opacity-80">
+              Import Data
+            </Link>
             <Link to="/functions" className="text-sm underline underline-offset-4 hover:opacity-80">
               Run Functions
             </Link>
